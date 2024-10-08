@@ -1,0 +1,29 @@
+.jest-coverage-green {
+    background: #2ecc71 !important;
+}
+
+.jest-coverage-red {
+    background: #F55353 !important;
+}
+
+.jest-coverage-green-border {
+    border-left: 4px solid #2ecc71 !important;
+}
+
+.jest-coverage-red-border {
+    border-left: 4px solid #F55353 !important;
+}
+
+.jest-float-button{
+	position:fixed;
+	width: 100px;
+	height: 30px;
+    padding: 5px;
+	bottom: 40px;
+	right: 40px;
+	background-color: #0d1117;
+	color:#FFF;
+	text-align:center;
+    border: 1px solid black;
+    z-index: 1000;
+}
