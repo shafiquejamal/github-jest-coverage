@@ -9,8 +9,8 @@ I will try to get this working for public repos.
 - Clone this repo
 - `cd` into the project root
 - run `npm run build`
-- In Chrome select Exetensions -> Manage Exetensions (or in the Chrome browser navigation bar go to chrome://extensions/) -> Load Unpacked
-
+- In Chrome select Exetensions -> Manage Exetensions (or in the Chrome browser navigation bar go to chrome://extensions/) -> Load Unpacked:
+  
 ![Screenshot 2025-03-15 at 11 30 50 AM](https://github.com/user-attachments/assets/eb0fd3b8-71ee-48ba-a9e1-d23676f24ddf)
 
 - Select the `dist/` folder in the project (it should have been created by running `npm run build`)
@@ -30,5 +30,14 @@ I will try to get this working for public repos.
 
 - Click "Save and Reload"
 
-You should now see vertical red and green bars showing coverage.
+You should now see vertical red and green bars showing coverage. See [this example PR](https://github.com/shafiquejamal/gitub-example-visual-code-coverage-for-pr/pull/1):
+
+![Screenshot 2025-03-15 at 1 01 47 PM](https://github.com/user-attachments/assets/8b40acc9-82d7-40cb-864c-20c0ab6d76ac)
+
+Notice the green and red vertical bars:
+
+![Screenshot 2025-03-15 at 1 02 06 PM](https://github.com/user-attachments/assets/fa6570eb-5c4e-417d-845d-addfcc27b5b0)
+
+and compare those vertical bars with what the test covers. The red matches up with what is not covered, and the green matches up with what is covered. 
+
 
