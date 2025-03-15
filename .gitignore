@@ -6,3 +6,4 @@ src/coverage-final.json
 src/test.ts
 code.zip
 zip.sh
+.DS_Store
