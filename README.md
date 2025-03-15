@@ -2,7 +2,7 @@
 
 This repo shows code coverage of PRs visually for TypeScript and JavaScript projects. It is an extension that works for Chrome. It works for private repositories - you will need to have a GitHub access token that is able to read your repo and read the GitHub actions artifacts in that repo.
 
-I will try to get this working for public repos.
+I think this works for public repos also; in this case, you won't need a GitHub token.
 
 ## Installation
 
@@ -10,7 +10,7 @@ I will try to get this working for public repos.
 - `cd` into the project root
 - run `npm run build`
 - In Chrome select Exetensions -> Manage Exetensions (or in the Chrome browser navigation bar go to chrome://extensions/) -> Load Unpacked:
-  
+
 ![Screenshot 2025-03-15 at 11 30 50 AM](https://github.com/user-attachments/assets/eb0fd3b8-71ee-48ba-a9e1-d23676f24ddf)
 
 - Select the `dist/` folder in the project (it should have been created by running `npm run build`)
@@ -38,6 +38,4 @@ Notice the green and red vertical bars:
 
 ![Screenshot 2025-03-15 at 1 02 06 PM](https://github.com/user-attachments/assets/fa6570eb-5c4e-417d-845d-addfcc27b5b0)
 
-and compare those vertical bars with what the test covers. The red matches up with what is not covered, and the green matches up with what is covered. 
-
-
+and compare those vertical bars with what the test covers. The red matches up with what is not covered, and the green matches up with what is covered.
