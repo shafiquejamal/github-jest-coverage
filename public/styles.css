@@ -1,20 +1,20 @@
-.jest-coverage-green {
+.cobertura-coverage-green {
     background: #2ecc71 !important;
 }
 
-.jest-coverage-red {
+.cobertura-coverage-red {
     background: #F55353 !important;
 }
 
-.jest-coverage-green-border {
+.cobertura-coverage-green-border {
     border-left: 4px solid #2ecc71 !important;
 }
 
-.jest-coverage-red-border {
+.cobertura-coverage-red-border {
     border-left: 4px solid #F55353 !important;
 }
 
-.jest-float-button{
+.cobertura-float-button{
 	position:fixed;
 	width: 100px;
 	height: 30px;
