@@ -1,11 +1,6 @@
 import { Coverage, CoverageFile, Git } from "./git";
 import $ from "jquery";
 
-export enum UiMode {
-  Inline = "inline",
-  Border = "border",
-}
-
 export interface PR {
   owner: string;
   repo: string;
@@ -16,7 +11,7 @@ export class CoverageLoader {
   coverageShown: boolean = false;
   pr: PR | undefined;
 
-  constructor(private git: Git, private uiMode: UiMode) {}
+  constructor(private git: Git) {}
 
   async loadCoverage(url: PR) {
     // const url = this.parseUrl();
@@ -67,8 +62,6 @@ export class CoverageLoader {
     }
 
     let tdDom = fileDom.find(`td[data-line-anchor="${diffAnchor}R${line}"]`);
-
-    console.log(fileDom, diffAnchor, tdDom, line);
     // const tdDom = lineContainer.find("td.blob-code");
     if (show) {
       if (covered) {
@@ -89,7 +82,6 @@ export class CoverageLoader {
     }
 
     if (!this.coverage[fileName]) {
-      console.log(this.coverage);
       console.log("File %s not found in coverage", fileName);
       return;
     }
@@ -100,9 +92,6 @@ export class CoverageLoader {
   highlightFile(fileCoverage: CoverageFile, show: boolean) {
     // aria-label="Diff for: internal/cli/config/config.go"
     const fileDom = $(`[aria-label="Diff for: ${fileCoverage.path}"]`);
-
-    console.log(fileCoverage.path, fileCoverage, fileDom);
-
     const statementsBlocks = Object.keys(fileCoverage.statementMap);
     for (let i = 0; i < statementsBlocks.length; i++) {
       const block = statementsBlocks[i];

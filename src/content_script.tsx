@@ -1,4 +1,4 @@
-import { CoverageLoader, PR, UiMode } from "./coverage";
+import { CoverageLoader, PR } from "./coverage";
 import $ from "jquery";
 import { Octokit } from "@octokit/rest";
 import * as store from "./store";
@@ -18,11 +18,8 @@ const init = async () => {
       return "";
     });
   if (!accessToken) return;
-  const uiMode: UiMode = (await store.get(store.Keys.UI_MODE).catch((err) => {
-    return UiMode.Border;
-  })) as any;
   const octokit = new Octokit({ auth: accessToken });
-  coverageLoader = new CoverageLoader(new Git(octokit), uiMode);
+  coverageLoader = new CoverageLoader(new Git(octokit));
 };
 
 const addFloatContainer = () => {
