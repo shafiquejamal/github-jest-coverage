@@ -61,40 +61,51 @@ export class CoverageLoader {
     fileDom: JQuery<Element>,
     show: boolean
   ) {
-    const lineContainer = fileDom.find(`[data-line-number="${line}"]`).parent();
-    if (this.uiMode === UiMode.Inline) {
-      const lineDom = lineContainer.find(".blob-code-inner");
-      if (show) {
-        if (covered) {
-          lineDom.addClass("cobertura-coverage-green");
-        } else {
-          lineDom.addClass("cobertura-coverage-red");
-        }
+    const diffAnchor = fileDom.data("diffAnchor");
+    if (!diffAnchor) {
+      return;
+    }
+
+    let tdDom = fileDom.find(`td[data-line-anchor="${diffAnchor}R${line}"]`);
+
+    console.log(fileDom, diffAnchor, tdDom, line);
+    // const tdDom = lineContainer.find("td.blob-code");
+    if (show) {
+      if (covered) {
+        tdDom.addClass("cobertura-coverage-green-border");
       } else {
-        lineDom.removeClass("cobertura-coverage-green");
-        lineDom.removeClass("cobertura-coverage-red");
+        tdDom.addClass("cobertura-coverage-red-border");
       }
     } else {
-      const tdDom = lineContainer.find("td.blob-code");
-      if (show) {
-        if (covered) {
-          tdDom.addClass("cobertura-coverage-green-border");
-        } else {
-          tdDom.addClass("cobertura-coverage-red-border");
-        }
-      } else {
-        tdDom.removeClass("cobertura-coverage-green-border");
-        tdDom.removeClass("cobertura-coverage-red-border");
-      }
+      tdDom.removeClass("cobertura-coverage-green-border");
+      tdDom.removeClass("cobertura-coverage-red-border");
     }
   }
 
-  highlightFile(fileCoverage: CoverageFile, show: boolean) {
-    const fileDom = $(`[data-tagsearch-path="${fileCoverage.path}"]`);
+  highlightFileName(fileName: string, show: boolean) {
+    if (!this.coverage) {
+      console.log("Coverage not loaded");
+      return;
+    }
 
-    const statmentsBlocks = Object.keys(fileCoverage.statementMap);
-    for (let i = 0; i < statmentsBlocks.length; i++) {
-      const block = statmentsBlocks[i];
+    if (!this.coverage[fileName]) {
+      console.log(this.coverage);
+      console.log("File %s not found in coverage", fileName);
+      return;
+    }
+
+    this.highlightFile(this.coverage[fileName], show);
+  }
+
+  highlightFile(fileCoverage: CoverageFile, show: boolean) {
+    // aria-label="Diff for: internal/cli/config/config.go"
+    const fileDom = $(`[aria-label="Diff for: ${fileCoverage.path}"]`);
+
+    console.log(fileCoverage.path, fileCoverage, fileDom);
+
+    const statementsBlocks = Object.keys(fileCoverage.statementMap);
+    for (let i = 0; i < statementsBlocks.length; i++) {
+      const block = statementsBlocks[i];
       const statmentBlock = fileCoverage.statementMap[block];
       for (
         let line = statmentBlock.start.line;

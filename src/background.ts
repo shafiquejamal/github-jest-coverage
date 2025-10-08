@@ -11,3 +11,15 @@ chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, tab) {
     } catch (err) {}
   }
 });
+
+chrome.webRequest.onCompleted.addListener(
+  function (details) {
+    try {
+      chrome.tabs.sendMessage(details.tabId, {
+        type: "url_request",
+        url: details.url,
+      });
+    } catch (err) {}
+  },
+  { urls: ["https://github.com/*"] } // Filter for all URLs or specific patterns
+);

@@ -102,9 +102,34 @@ const checkAndReload = () => {
   }
 };
 
+const displayFileCoverage = (fileName: string) => {
+  if (!coverageLoader) return;
+
+  coverageLoader.highlightFileName(fileName, true);
+};
+
+function pathsFromGithubDiffURL(urlStr: string) {
+  const url = new URL(urlStr);
+  const pathsParam = url.searchParams.get("paths");
+  if (!pathsParam) return [];
+
+  // `pathsParam` is already decoded by URLSearchParams (e.g., "%2F" -> "/").
+  return pathsParam
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+}
+
 chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
   if (msg.type == "url_update") {
     checkAndReload();
+  }
+
+  if (msg.type == "url_request") {
+    // console.log("url_request", pathsFromGithubDiffURL(msg.url));
+    for (const fileName of pathsFromGithubDiffURL(msg.url)) {
+      displayFileCoverage(fileName);
+    }
   }
   sendResponse({});
 });

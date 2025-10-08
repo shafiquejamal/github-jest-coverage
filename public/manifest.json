@@ -1,8 +1,9 @@
 {
+  "$schema": "https://json.schemastore.org/chrome-manifest",
   "manifest_version": 3,
 
   "name": "Cobertura Coverage",
-  "description": "Cobertura coverage on github prs",
+  "description": "Cobertura coverage on GitHub Pull Requests",
   "version": "1.0",
 
   "action": {
@@ -22,7 +23,7 @@
     "service_worker": "js/background.js"
   },
 
-  "permissions": ["storage", "tabs"],
+  "permissions": ["storage", "tabs", "webRequest"],
 
   "host_permissions": ["<all_urls>"]
 }

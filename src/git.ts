@@ -48,13 +48,83 @@ export class Git {
     let updatedCoverage: Coverage = {};
     Object.keys(coverage).forEach((file) => {
       const index = file.lastIndexOf(repo);
-      const path = file.substring(index + repo.length + 1); // +1 for the slash
+      const path =
+        index === -1 ? file : file.substring(index + repo.length + 1); // +1 for the slash
       updatedCoverage[path] = {
         ...coverage[file],
         path: path,
       };
     });
     return updatedCoverage;
+  }
+
+  private buildCoverageCacheKey(
+    owner: string,
+    repo: string,
+    workflowRunId: number
+  ) {
+    return `coverage_cache:${owner}/${repo}/${workflowRunId}`;
+  }
+
+  private async tryReadCoverageFromLocalCache(
+    owner: string,
+    repo: string,
+    workflowRunId: number
+  ): Promise<Coverage | null> {
+    try {
+      // Guard for non-extension/test environments
+      if (
+        typeof chrome === "undefined" ||
+        !chrome.storage ||
+        !chrome.storage.local
+      ) {
+        return null;
+      }
+      const key = this.buildCoverageCacheKey(owner, repo, workflowRunId);
+      return await new Promise((resolve) => {
+        chrome.storage.local.get([key], (result: any) => {
+          const stored = result ? result[key] : null;
+          if (!stored) {
+            resolve(null);
+            return;
+          }
+          try {
+            // Support both raw object and stringified JSON
+            const value =
+              typeof stored === "string" ? JSON.parse(stored) : stored;
+            resolve(value as Coverage);
+          } catch (_e) {
+            resolve(null);
+          }
+        });
+      });
+    } catch (_e) {
+      return null;
+    }
+  }
+
+  private async tryWriteCoverageToLocalCache(
+    owner: string,
+    repo: string,
+    workflowRunId: number,
+    coverage: Coverage
+  ): Promise<void> {
+    try {
+      if (
+        typeof chrome === "undefined" ||
+        !chrome.storage ||
+        !chrome.storage.local
+      ) {
+        return;
+      }
+      const key = this.buildCoverageCacheKey(owner, repo, workflowRunId);
+      const payload: any = {};
+      // Store as string to be conservative about serialization
+      payload[key] = JSON.stringify(coverage);
+      chrome.storage.local.set(payload, () => {});
+    } catch (_e) {
+      // no-op: caching is best-effort
+    }
   }
 
   async getCoverageForRun(owner: string, repo: string, runId: number) {
@@ -74,15 +144,26 @@ export class Git {
       })
     ).data;
 
+    // Check local cache by workflow run id before downloading artifacts
+    const cached = await this.tryReadCoverageFromLocalCache(
+      owner,
+      repo,
+      actions_run.id
+    );
+    if (cached) {
+      return cached;
+    }
+
     const artifacts = await this.octokit.actions.listWorkflowRunArtifacts({
       owner: owner,
       repo: repo,
       run_id: actions_run.id,
     });
 
-    const coverageArtifacts = artifacts.data.artifacts.filter(
-      (a) => a.name.includes("coverage") && a.name.includes(".json")
-    );
+    const coverageArtifacts = artifacts.data.artifacts.filter((a) => {
+      const name = a.name.toLowerCase();
+      return name.includes("coverage") || name.includes("cobertura");
+    });
 
     if (coverageArtifacts.length > 0) {
       const coverageArtifact = coverageArtifacts[0];
@@ -94,13 +175,44 @@ export class Git {
       });
 
       const coverage = await JSZip.loadAsync(coveragezip.data as any).then(
-        (zip) => {
-          const coverageContent = zip.files["coverage-final.json"];
-          return coverageContent
-            .async("text")
-            .then((content) => JSON.parse(content));
+        async (zip) => {
+          // Try JSON first (coverage-final.json or any coverage*.json)
+          const jsonDirect = zip.files["coverage-final.json"];
+          if (jsonDirect) {
+            const content = await jsonDirect.async("text");
+            return JSON.parse(content);
+          }
+          const jsonFallbackKey = Object.keys(zip.files).find((k) => {
+            const lower = k.toLowerCase();
+            return lower.endsWith(".json") && lower.includes("coverage");
+          });
+          if (jsonFallbackKey) {
+            const content = await zip.files[jsonFallbackKey].async("text");
+            return JSON.parse(content);
+          }
+
+          // Try Cobertura XML (cobertura.xml or any *.xml containing cobertura/coverage)
+          const xmlKey = Object.keys(zip.files).find((k) => {
+            const lower = k.toLowerCase();
+            if (!lower.endsWith(".xml")) return false;
+            return lower.includes("cobertura") || lower.includes("coverage");
+          });
+          if (xmlKey) {
+            const xmlText = await zip.files[xmlKey].async("text");
+            return this.parseCoberturaXml(xmlText);
+          }
+          return null;
         }
       );
+      if (coverage) {
+        // Best-effort write to cache for subsequent loads
+        await this.tryWriteCoverageToLocalCache(
+          owner,
+          repo,
+          actions_run.id,
+          coverage
+        );
+      }
       return coverage;
     }
     return null;
@@ -139,5 +251,61 @@ export class Git {
       return this.normalizePaths(repo, coverage);
     }
     return null;
+  }
+
+  private parseCoberturaXml(xmlText: string): Coverage {
+    const coverage: Coverage = {};
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xmlText, "application/xml");
+    const classNodes = Array.from(doc.getElementsByTagName("class"));
+
+    classNodes.forEach((cls) => {
+      const filenameAttr =
+        cls.getAttribute("filename") || cls.getAttribute("name") || "";
+      if (!filenameAttr) {
+        return;
+      }
+
+      // Ensure file bucket exists so we can merge across duplicate class nodes
+      if (!coverage[filenameAttr]) {
+        coverage[filenameAttr] = {
+          path: filenameAttr,
+          statementMap: {},
+          branchMap: {},
+          fnMap: {},
+          s: {},
+          f: {},
+          b: {},
+        };
+      }
+
+      const fileCoverage = coverage[filenameAttr];
+
+      // Collect all descendant <line> nodes, including those under <methods><method><lines>
+      const lineNodes = Array.from(cls.getElementsByTagName("line"));
+      lineNodes.forEach((lineNode) => {
+        const numberAttr = lineNode.getAttribute("number");
+        if (!numberAttr) return;
+        const hitsAttr = lineNode.getAttribute("hits") || "0";
+        const lineNumber = parseInt(numberAttr, 10);
+        if (Number.isNaN(lineNumber)) return;
+        const key = String(lineNumber);
+
+        // Ensure a statement entry exists for this exact line
+        if (!fileCoverage.statementMap[key]) {
+          fileCoverage.statementMap[key] = {
+            start: { line: lineNumber, column: null },
+            end: { line: lineNumber, column: null },
+          };
+        }
+
+        // Merge hits, preferring the maximum when duplicate entries are seen
+        const incomingHits = parseInt(hitsAttr, 10) || 0;
+        const existingHits = (fileCoverage.s as any)[key] || 0;
+        (fileCoverage.s as any)[key] = Math.max(existingHits, incomingHits);
+      });
+    });
+
+    return coverage;
   }
 }
