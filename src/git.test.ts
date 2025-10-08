@@ -1,13 +1,13 @@
-import { Git } from "./git";
+import { Octokit } from "@octokit/rest";
+import { Coverage, Git, parseCoberturaXml } from "./git";
 
-// Minimal Octokit stub for constructor; tests call only private helpers via casting
 class OctokitStub {}
 
-const buildGit = () => new (Git as any)(new OctokitStub());
+const buildGit = () => new Git(new OctokitStub() as unknown as Octokit);
 
 describe("Git.normalizePaths", () => {
   test("strips repo prefix when present", () => {
-    const git: any = buildGit();
+    const git = buildGit();
     const coverage = {
       "/home/runner/work/my-repo/my-repo/src/file.ts": {
         path: "/home/runner/work/my-repo/my-repo/src/file.ts",
@@ -23,14 +23,14 @@ describe("Git.normalizePaths", () => {
         f: {},
         b: {},
       },
-    } as any;
+    } satisfies Coverage;
     const normalized = git.normalizePaths("my-repo", coverage);
     expect(Object.keys(normalized)).toEqual(["src/file.ts"]);
     expect(normalized["src/file.ts"].path).toBe("src/file.ts");
   });
 
   test("keeps original path when repo segment is missing", () => {
-    const git: any = buildGit();
+    const git = buildGit();
     const coverage = {
       "src/file.ts": {
         path: "src/file.ts",
@@ -41,7 +41,7 @@ describe("Git.normalizePaths", () => {
         f: {},
         b: {},
       },
-    } as any;
+    } satisfies Coverage;
     const normalized = git.normalizePaths("my-repo", coverage);
     expect(Object.keys(normalized)).toEqual(["src/file.ts"]);
     expect(normalized["src/file.ts"].path).toBe("src/file.ts");
@@ -50,7 +50,7 @@ describe("Git.normalizePaths", () => {
 
 describe("Git.parseCoberturaXml", () => {
   test("parses class lines into statementMap and s counts", () => {
-    const git: any = buildGit();
+    const git = buildGit();
     const xml = `<?xml version="1.0" ?>
 <coverage>
   <packages>
@@ -66,7 +66,7 @@ describe("Git.parseCoberturaXml", () => {
     </package>
   </packages>
 </coverage>`;
-    const parsed = git["parseCoberturaXml"](xml);
+    const parsed = parseCoberturaXml(xml);
     expect(parsed["src/file.ts"]).toBeDefined();
     const file = parsed["src/file.ts"];
     expect(file.path).toBe("src/file.ts");
@@ -83,7 +83,7 @@ describe("Git.parseCoberturaXml", () => {
   });
 
   test("merges duplicate class entries and prefers max hits for same line", () => {
-    const git: any = buildGit();
+    const git = buildGit();
     const xml = `<?xml version="1.0" ?>
 <coverage>
   <packages>
@@ -105,7 +105,7 @@ describe("Git.parseCoberturaXml", () => {
     </package>
   </packages>
 </coverage>`;
-    const parsed = git["parseCoberturaXml"](xml);
+    const parsed = parseCoberturaXml(xml);
     const file = parsed["src/file.ts"];
     expect(Object.keys(file.statementMap).sort()).toEqual(["10", "20", "30"]);
     expect(file.s["10"]).toBe(2); // max of 0 and 2
@@ -134,7 +134,7 @@ describe("Git.parseCoberturaXml", () => {
     </package>
   </packages>
 </coverage>`;
-    const parsed = git["parseCoberturaXml"](xml);
+    const parsed = parseCoberturaXml(xml);
     const file = parsed["src/file2.ts"];
     expect(file).toBeDefined();
     expect(file.s["100"]).toBe(5);

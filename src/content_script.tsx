@@ -1,25 +1,24 @@
-import { CoverageLoader, PR } from "./coverage";
 import $ from "jquery";
 import { Octokit } from "@octokit/rest";
-import * as store from "./store";
+import { CoverageLoader, PR } from "./coverage";
+import { get, Keys } from "./store";
 import { Git } from "./git";
 
-console.log("Cobertura Coverage Script Loaded");
+let coverageLoader: CoverageLoader | undefined;
 
-let coverageLoader: CoverageLoader;
-
-const init = async () => {
-  const accessToken = await store
-    .get(store.Keys.GITHUB_ACCESS_TOKEN)
-    .catch((err) => {
-      console.log(
-        "Github access token not set. Please set it from the popup screen and refresh."
-      );
-      return "";
-    });
-  if (!accessToken) return;
-  const octokit = new Octokit({ auth: accessToken });
-  coverageLoader = new CoverageLoader(new Git(octokit));
+const init = async (): Promise<void> => {
+  try {
+    const accessToken = await get<string>(Keys.GITHUB_ACCESS_TOKEN);
+    if (!accessToken) {
+      return;
+    }
+    const octokit = new Octokit({ auth: accessToken });
+    coverageLoader = new CoverageLoader(new Git(octokit));
+  } catch (error) {
+    console.info(
+      "GitHub access token not set. Please configure it from the popup and refresh."
+    );
+  }
 };
 
 const addFloatContainer = () => {
@@ -38,8 +37,9 @@ const addFloatSection = () => {
     <input type="checkbox" id="showCoberturaCoverage" checked>
     <label for="showCoberturaCoverage">Coverage</label>
   `);
-  $("#showCoberturaCoverage").on("change", function () {
-    const checked = (this as any).checked;
+  $("#showCoberturaCoverage").on("change", (event) => {
+    const checked = (event.currentTarget as HTMLInputElement).checked;
+    if (!coverageLoader) return;
     if (checked) {
       coverageLoader.showCoverage();
     } else {
@@ -48,35 +48,35 @@ const addFloatSection = () => {
   });
 };
 
-$(document).on("click", function () {
-  setTimeout(() => {
-    // refresh ui
+$(document).on("click", () => {
+  window.setTimeout(() => {
     if (coverageLoader && coverageLoader.coverageShown) {
       coverageLoader.showCoverage();
     }
   }, 1000);
 });
 
-const loadPr = (pr: PR) => {
+const loadPr = async (pr: PR) => {
   addFloatContainer();
-  coverageLoader.setPr(pr);
-  coverageLoader.loadCoverage(pr).then(() => {
-    if (coverageLoader.coverage) {
-      addFloatSection();
-      coverageLoader.showCoverage();
-    } else {
-      removeFloatContainer();
-    }
-  });
+  coverageLoader?.setPr(pr);
+
+  await coverageLoader?.loadCoverage(pr);
+
+  if (coverageLoader?.coverage) {
+    addFloatSection();
+    coverageLoader.showCoverage();
+    return;
+  }
+  removeFloatContainer();
 };
 
 (() => {
   init().then(() => {
-    const pr = coverageLoader.parseUrl();
+    const pr = coverageLoader?.parseUrl();
     if (!pr) {
       return;
     }
-    loadPr(pr);
+    void loadPr(pr);
   });
 })();
 
@@ -87,15 +87,14 @@ const checkAndReload = () => {
     removeFloatContainer();
     return;
   }
-  let currentPr = coverageLoader.pr;
-  const shoudLoad =
+  const currentPr = coverageLoader.pr;
+  const shouldLoad =
     !currentPr ||
-    currentPr.owner != pr.owner ||
-    currentPr.repo != pr.repo ||
-    currentPr.pull != pr.pull;
-  if (shoudLoad) {
-    console.log("loading new pr");
-    loadPr(pr);
+    currentPr.owner !== pr.owner ||
+    currentPr.repo !== pr.repo ||
+    currentPr.pull !== pr.pull;
+  if (shouldLoad) {
+    void loadPr(pr);
   }
 };
 
@@ -117,16 +116,15 @@ function pathsFromGithubDiffURL(urlStr: string) {
     .filter(Boolean);
 }
 
-chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
-  if (msg.type == "url_update") {
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg.type === "url_update") {
     checkAndReload();
   }
 
-  if (msg.type == "url_request") {
-    // console.log("url_request", pathsFromGithubDiffURL(msg.url));
-    for (const fileName of pathsFromGithubDiffURL(msg.url)) {
+  if (msg.type === "url_request") {
+    pathsFromGithubDiffURL(msg.url).forEach((fileName) => {
       displayFileCoverage(fileName);
-    }
+    });
   }
   sendResponse({});
 });

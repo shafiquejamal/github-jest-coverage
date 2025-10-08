@@ -1,5 +1,5 @@
-import { Coverage, CoverageFile, Git } from "./git";
 import $ from "jquery";
+import { Coverage, CoverageFile, Git } from "./git";
 
 export interface PR {
   owner: string;
@@ -7,133 +7,128 @@ export interface PR {
   pull: string;
 }
 export class CoverageLoader {
-  coverage: Coverage | undefined = undefined;
-  coverageShown: boolean = false;
-  pr: PR | undefined;
+  #coverage: Coverage | undefined;
+  #coverageShown = false;
+  #pr: PR | undefined;
 
-  constructor(private git: Git) {}
+  constructor(private readonly git: Git) {}
 
-  async loadCoverage(url: PR) {
-    // const url = this.parseUrl();
-    // if (!url) return;
+  get coverage(): Coverage | undefined {
+    return this.#coverage;
+  }
 
-    const { owner, repo, pull } = url;
+  get coverageShown(): boolean {
+    return this.#coverageShown;
+  }
 
+  get pr(): PR | undefined {
+    return this.#pr;
+  }
+
+  async loadCoverage(pr: PR): Promise<void> {
+    const { owner, repo, pull } = pr;
     const coverage = await this.git.getCoverage({
       owner,
       repo,
       pull: Number(pull),
     });
+
     if (!coverage) {
-      console.log("Coverage file not found.");
+      console.info("Coverage file not found.");
       return;
     }
-    this.coverage = coverage;
+
+    this.#coverage = coverage;
   }
 
-  showCoverage() {
-    this.toggleCoverageUI(true);
+  showCoverage(): void {
+    void this.toggleCoverageUI(true);
   }
 
-  hideCoverage() {
-    this.toggleCoverageUI(false);
+  hideCoverage(): void {
+    void this.toggleCoverageUI(false);
   }
 
-  async toggleCoverageUI(show: boolean) {
-    if (!this.coverage) return;
-    this.coverageShown = show;
-    const files = Object.keys(this.coverage);
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      this.highlightFile(this.coverage[file], show);
+  async toggleCoverageUI(show: boolean): Promise<void> {
+    if (!this.#coverage) {
+      return;
     }
-    console.log("UI for coverage updated");
+
+    this.#coverageShown = show;
+    const files = Object.values(this.#coverage);
+    files.forEach((file) => this.highlightFile(file, show));
   }
 
-  async highlightLine(
+  highlightLine(
     line: number,
     covered: boolean,
     fileDom: JQuery<Element>,
     show: boolean
-  ) {
+  ): void {
     const diffAnchor = fileDom.data("diffAnchor");
     if (!diffAnchor) {
       return;
     }
 
-    let tdDom = fileDom.find(`td[data-line-anchor="${diffAnchor}R${line}"]`);
-    // const tdDom = lineContainer.find("td.blob-code");
+    const tdDom = fileDom.find(`td[data-line-anchor="${diffAnchor}R${line}"]`);
     if (show) {
-      if (covered) {
-        tdDom.addClass("cobertura-coverage-green-border");
-      } else {
-        tdDom.addClass("cobertura-coverage-red-border");
-      }
-    } else {
-      tdDom.removeClass("cobertura-coverage-green-border");
-      tdDom.removeClass("cobertura-coverage-red-border");
-    }
-  }
-
-  highlightFileName(fileName: string, show: boolean) {
-    if (!this.coverage) {
-      console.log("Coverage not loaded");
+      tdDom.toggleClass("cobertura-coverage-green-border", covered);
+      tdDom.toggleClass("cobertura-coverage-red-border", !covered);
       return;
     }
 
-    if (!this.coverage[fileName]) {
-      console.log("File %s not found in coverage", fileName);
+    tdDom.removeClass("cobertura-coverage-green-border cobertura-coverage-red-border");
+  }
+
+  highlightFileName(fileName: string, show: boolean): void {
+    if (!this.#coverage) {
+      console.info("Coverage not loaded");
       return;
     }
 
-    this.highlightFile(this.coverage[fileName], show);
+    const fileCoverage = this.#coverage[fileName];
+    if (!fileCoverage) {
+      console.info("File %s not found in coverage", fileName);
+      return;
+    }
+
+    this.highlightFile(fileCoverage, show);
   }
 
-  highlightFile(fileCoverage: CoverageFile, show: boolean) {
-    // aria-label="Diff for: internal/cli/config/config.go"
-    const fileDom = $(`[aria-label="Diff for: ${fileCoverage.path}"]`);
-    const statementsBlocks = Object.keys(fileCoverage.statementMap);
-    for (let i = 0; i < statementsBlocks.length; i++) {
-      const block = statementsBlocks[i];
-      const statmentBlock = fileCoverage.statementMap[block];
-      for (
-        let line = statmentBlock.start.line;
-        line <= statmentBlock.end.line;
-        line++
-      ) {
+  highlightFile(fileCoverage: CoverageFile, show: boolean): void {
+    const fileDom = $(`table[aria-label~="${fileCoverage.path}"]`);
+
+    Object.entries(fileCoverage.statementMap).forEach(([block, segment]) => {
+      for (let line = segment.start.line; line <= segment.end.line; line += 1) {
         this.highlightLine(line, fileCoverage.s[block] > 0, fileDom, show);
       }
-    }
-    const fnBlocks = Object.keys(fileCoverage.fnMap);
-    for (let i = 0; i < fnBlocks.length; i++) {
-      const block = fnBlocks[i];
-      const fnBlock = fileCoverage.fnMap[block];
+    });
+
+    Object.entries(fileCoverage.fnMap).forEach(([block, fnBlock]) => {
       this.highlightLine(
         fnBlock.decl.start.line,
         fileCoverage.f[block] > 0,
         fileDom,
         show
       );
-    }
+    });
   }
 
-  parseUrl() {
-    const regex = /github\.com\/(.*?)\/(.*?)\/pull\/(.*?)\/files(.*)$/gm;
+  parseUrl(): PR | null {
+    const regex = /github\.com\/(.*?)\/(.*?)\/pull\/(.*?)\/files(.*)$/;
     const url = window.document.location.href;
     const matches = regex.exec(url);
     if (!matches || matches.length < 4) {
-      console.log(
-        `Couldn\'t match ${url} to github pull request files changes page regex.`
+      console.info(
+        `Could not match ${url} to GitHub pull request files changes page regex.`
       );
       return null;
     }
-    const owner = matches[1];
-    const repo = matches[2];
-    const pull = matches[3];
-    return { owner, repo, pull } as PR;
+    const [owner, repo, pull] = matches.slice(1, 4);
+    return { owner, repo, pull } satisfies PR;
   }
 
-  setPr(pr: PR) {
-    this.pr = pr;
+  setPr(pr: PR | undefined): void {
+    this.#pr = pr;
   }
 }

@@ -1,25 +1,33 @@
-console.log("background script loaded");
-chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, tab) {
-  // read changeInfo data and do something with it
-  // like send the new url to contentscripts.js
-  if (changeInfo.url && changeInfo.url.indexOf("github.com") >= 0) {
-    try {
-      chrome.tabs.sendMessage(tabId, {
-        type: "url_update",
-        url: changeInfo.url,
-      });
-    } catch (err) {}
+const notifyContentScript = (
+  tabId: number,
+  message: Record<string, unknown>
+) => {
+  chrome.tabs.sendMessage(tabId, message, () => {
+    const error = chrome.runtime.lastError;
+    if (error) {
+      console.debug("Unable to notify tab", tabId, error.message);
+    }
+  });
+};
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  const url = changeInfo.url;
+  if (!url || !url.includes("github.com")) {
+    return;
   }
+
+  notifyContentScript(tabId, {
+    type: "url_update",
+    url,
+  });
 });
 
 chrome.webRequest.onCompleted.addListener(
-  function (details) {
-    try {
-      chrome.tabs.sendMessage(details.tabId, {
-        type: "url_request",
-        url: details.url,
-      });
-    } catch (err) {}
+  (details) => {
+    notifyContentScript(details.tabId, {
+      type: "url_request",
+      url: details.url,
+    });
   },
-  { urls: ["https://github.com/*"] } // Filter for all URLs or specific patterns
+  { urls: ["https://github.com/*"] }
 );
