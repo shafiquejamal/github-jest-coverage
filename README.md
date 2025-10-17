@@ -1,5 +1,9 @@
 # Introduction
 
+--- UPDATE ---
+This repository is deprecated. Please see https://github.com/shafiquejamal/github-pr-visual-code-coverage instead. 
+
+
 This repo shows code coverage of PRs visually for TypeScript and JavaScript projects. It is an extension that works for Chrome. It works for private repositories - you will need to have a GitHub access token that is able to read your repo and read the GitHub actions artifacts in that repo.
 
 I think this works for public repos also; in this case, you won't need a GitHub token.
